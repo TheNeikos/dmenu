@@ -1,0 +1,7 @@
+config.h
+dmenu
+dmenu.o
+draw.o
+stest
+stest.1
+stest.o
