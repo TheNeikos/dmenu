@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <regex.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -28,6 +29,7 @@ struct Item {
 static void appenditem(Item *item, Item **list, Item **last);
 static void calcoffsets(void);
 static char *cistrstr(const char *s, const char *sub);
+static char *rcistrstr(const char *s, const char *sub);
 static void drawmenu(void);
 static void grabkeyboard(void);
 static void insert(const char *str, ssize_t n);
@@ -56,6 +58,8 @@ static Window win;
 static XIC xic;
 static int mon = -1;
 
+static regex_t regex;
+
 #include "config.h"
 
 static int (*fstrncmp)(const char *, const char *, size_t) = strncmp;
@@ -79,6 +83,10 @@ main(int argc, char *argv[]) {
         else if(!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
             fstrncmp = strncasecmp;
             fstrstr = cistrstr;
+        }
+        else if(!strcmp(argv[i], "-r")) { /* regex based matching */
+            fstrncmp = strncasecmp;
+            fstrstr = rcistrstr;
         }
         else if(i+1 == argc)
             usage();
@@ -155,6 +163,32 @@ cistrstr(const char *s, const char *sub) {
     for(len = strlen(sub); *s; s++)
         if(!strncasecmp(s, sub, len))
             return (char *)s;
+    return NULL;
+}
+
+char *
+rcistrstr(const char *s, const char *sub) {
+    int i;
+    int len = strlen(sub);
+    char buff[(len * 3) + 1];
+    buff[len] = 0;
+    for(i = 0; i < len; i++) {
+        buff[i * 3] = sub[i];
+        buff[i * 3 + 1] = '.';
+        buff[i * 3 + 2] = '*';
+    }
+
+    if(regcomp(&regex, buff, 0)){
+        eprintf("Could not compile regex \n");
+        return NULL;
+    }
+
+    if(!regexec(&regex, s, 0, NULL, 0)) {
+        regfree(&regex);
+        return (char *)s;
+    }
+
+    regfree(&regex);
     return NULL;
 }
 
